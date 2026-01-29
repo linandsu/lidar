@@ -44,7 +44,7 @@ const initThree = () => {
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxPoints * 3), 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(maxPoints * 3), 3));
   
-  const material = new THREE.PointsMaterial({ size: 0.15, vertexColors: true });
+  const material = new THREE.PointsMaterial({ size: 0.2, vertexColors: true });
   points = new THREE.Points(geometry, material);
   scene.add(points);
 
@@ -69,7 +69,7 @@ const connectWS = () => {
   socket.onerror = () => { statusMsg.value = "连接错误"; };
 
   socket.onmessage = (event) => {
-    // 简化处理：直接解析并渲染最新一帧（舍弃DB缓冲以降低延迟）
+    // 简化处理：直接解析并渲染最新一帧
     processFrameDirectly(event.data);
   };
 };
@@ -95,11 +95,12 @@ const processFrameDirectly = (buffer) => {
     positions[j+1] = z; // 交换 Y/Z 轴以适应 Three.js 坐标系
     positions[j+2] = y;
     
-    // 简单着色：根据强度
+
     const val = Math.min(intens / 255.0, 1.0);
-    colors[j] = val;
-    colors[j+1] = 1.0 - val;
-    colors[j+2] = 0.0;
+    
+    colors[j] = val;     // R (Red)
+    colors[j+1] = val;   // G (Green) -> R+G = 黄色
+    colors[j+2] = 0.0;   // B (Blue)
     
     j += 3;
   }
