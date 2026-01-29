@@ -9,9 +9,10 @@
 ```text
 lidar-project/
 ├── pointserver/           # [Backend] Python FastAPI 后端
-│   ├── main.py            # 启动入口 (Port: 8055)
-│   ├── lidar_parser.py    # 雷达数据解析核心逻辑
-│   ├── udp_worker.py      # UDP 多进程接收模块
+│   ├── src
+|   |   ├──main.py            # 启动入口 (Port: 8055)
+│   |   ├── lidar_parser.py    # 雷达数据解析核心逻辑
+│   |   ├── udp_worker.py      # UDP 多进程接收模块
 │   └── requirements.txt   # Python 依赖清单
 │
 ├── vue-point/             # [Frontend] Vue 3 前端
