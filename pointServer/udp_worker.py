@@ -3,10 +3,9 @@ import struct
 import multiprocessing
 import numpy as np
 import time
-from typing import Any  # 引入 Any
+from typing import Any
 from lidar_parser import LSS3_Parser_UTC
 
-# 将 queue 和 running_event 的类型改为 Any，避开 Pylance 检查错误
 def udp_parsing_worker(queue: Any, port: int, lidar_id: str, running_event: Any):
     """
     负责实时监听 UDP 端口，解析数据，并推送到队列
@@ -15,7 +14,9 @@ def udp_parsing_worker(queue: Any, port: int, lidar_id: str, running_event: Any)
     
     # 1. 创建 UDP Socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # 重要：增大接收缓冲区，防止丢包
+    
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 * 1024 * 1024) 
     
     try:

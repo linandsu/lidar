@@ -40,7 +40,8 @@ class ProcessManager:
         
         p = multiprocessing.Process(
             target=udp_parsing_worker,
-            args=(queue, cfg['port'], lidar_id, event)
+            args=(queue, cfg['port'], lidar_id, event),
+            daemon=True
         )
         p.start()
         
@@ -48,13 +49,19 @@ class ProcessManager:
         return queue
 
     def stop_lidar(self, lidar_id):
-        if lidar_id in self.workers:
-            w = self.workers[lidar_id]
-            w["event"].clear()
-            w["process"].join(timeout=1)
-            if w["process"].is_alive():
-                w["process"].terminate()
-            del self.workers[lidar_id]
+        # 使用 pop 安全移除，防止 ws 断开和 shutdown 同时调用引发 KeyError 或二次操作
+        worker = self.workers.pop(lidar_id, None)
+        
+        if worker:
+            print(f"[Manager] 正在停止进程: {lidar_id}")
+            worker["event"].clear()
+            # 设置超时，防止 join 卡死
+            worker["process"].join(timeout=1.0)
+            if worker["process"].is_alive():
+                print(f"[Manager] 超时强制终止: {lidar_id}")
+                worker["process"].terminate()
+            else:
+                print(f"[Manager] 进程正常退出: {lidar_id}")
 
     def stop_all(self):
         for lid in list(self.workers.keys()):
@@ -102,27 +109,39 @@ async def test_udp(port: int):
 async def ws_endpoint(websocket: WebSocket, lidar_id: str):
     await websocket.accept()
     
+    # 校验配置
     if lidar_id not in LIDAR_CONFIG:
         await websocket.close()
         return
 
-    # 按需启动进程
+    print(f"[WS] 前端连接雷达: {lidar_id}，正在启动子进程...")
+    
+    # 1. 启动子进程 (Worker)
     queue = manager.start_lidar(lidar_id)
     
     try:
         while True:
+            # 从队列取数据发送给前端
             if not queue.empty():
                 data = queue.get()
                 await websocket.send_bytes(data)
+                # 极短休眠，防止 CPU 空转死锁
                 await asyncio.sleep(0.001)
             else:
+                # 队列为空时多睡一会，降低 CPU 占用
                 await asyncio.sleep(0.01)
+
     except WebSocketDisconnect:
-        print(f"Client disconnected from {lidar_id}")
-        # 可选：无人连接时是否停止进程？这里暂不停止，保持后台运行
+        print(f"[WS] 前端主动断开连接: {lidar_id}")
+        
     except Exception as e:
-        print(f"WS Error: {e}")
+        print(f"[WS] 连接发生异常: {e}")
+        
+    finally:
+        print(f"[Resource] 正在清理雷达 {lidar_id} 的后台进程...")
+        # 将阻塞的进程 Join 操作放入线程池，避免阻塞 FastAPI 事件循环
+        await asyncio.to_thread(manager.stop_lidar, lidar_id)
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8055)
